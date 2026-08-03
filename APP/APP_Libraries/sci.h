@@ -17,13 +17,39 @@
 #if SCI_COMM_ENABLE
 
 #define SCIA_LSPCLK_HZ       37500000UL
-#define SCIA_DEFAULT_BAUD    4800UL
+#define SCIA_DEFAULT_BAUD    115200UL
+#define SCIA_DEBUG_UPDATE_DIV 400U
+
+/**
+ * @brief SCI波形调试数据对象。
+ * @note  ISR只更新快照和请求标志，字符串转换与发送由后台任务完成。
+ */
+typedef struct
+{
+    volatile float IL;
+    volatile float I_Ref;
+    volatile float Duty;
+    volatile float Vout;
+
+    volatile Uint16 Request;
+    Uint16 Prescaler;
+    Uint16 UpdateDiv;
+    volatile Uint16 DroppedFrames;
+} SCIA_Debug;
+
+extern SCIA_Debug SCIA_Debug_1;
 
 void SCIA_Init(Uint32 baud);
 void SCIA_SendByte(Uint16 data);
 void SCIA_SendString(const char *message);
 Uint16 SCIA_TryReceiveByte(Uint16 *data);
-void SCIA_BackgroundTask(void);
+void SCIA_Debug_Init(SCIA_Debug *p_debug, Uint16 updateDiv);
+void SCIA_Debug_Capture(SCIA_Debug *p_debug,
+                        float il,
+                        float iRef,
+                        float duty,
+                        float vout);
+void SCIA_Debug_Service(SCIA_Debug *p_debug);
 
 #endif /* SCI_COMM_ENABLE */
 

@@ -9,6 +9,7 @@
 #include "led.h"
 #include "function.h" // 包含模块化后的头文件
 #include "dac.h"
+#include "sci.h"
 #include "DSP2833x_Device.h"
 #include "DSP2833x_Examples.h"
 
@@ -100,6 +101,15 @@ interrupt void adc_isr(void)
 
         AdcRegs.ADCST.bit.INT_SEQ2_CLR = 1;
     }
+
+#if SCI_COMM_ENABLE
+    // ISR中只分频保存变量快照，字符串转换和发送由后台任务完成
+    SCIA_Debug_Capture(&SCIA_Debug_1,
+                       p->adc.IL,
+                       p->ctr.I_Ref,
+                       p->pwm.Duty,
+                       p->adc.Vout);
+#endif
 
     PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
 }

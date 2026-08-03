@@ -83,8 +83,8 @@ void BoostApp_BackgroundTask(void)
 #endif
 
 #if SCI_COMM_ENABLE
-    // SCI采用非阻塞轮询，不影响现有DAC后台发送
-    SCIA_BackgroundTask();
+    // SCI字符串转换和发送仅在后台执行
+    SCIA_Debug_Service(&SCIA_Debug_1);
 #endif
 }
 
@@ -143,7 +143,7 @@ static void Board_Init(Uint16 pwm_tbprd)
 
 #if SCI_COMM_ENABLE
     SCIA_Init(SCIA_DEFAULT_BAUD);
-    SCIA_SendString("SCI-A ready.\r\n");
+    SCIA_Debug_Init(&SCIA_Debug_1, SCIA_DEBUG_UPDATE_DIV);
 #endif
 
 #if DAC_DEBUG_ENABLE
