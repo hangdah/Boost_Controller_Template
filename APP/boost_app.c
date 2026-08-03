@@ -10,6 +10,7 @@
 #include "epwm.h"
 #include "led.h"
 #include "dac.h"
+#include "sci.h"
 #include "DSP2833x_Device.h"
 #include "DSP2833x_Examples.h"
 #include <stdint.h>
@@ -80,6 +81,11 @@ void BoostApp_BackgroundTask(void)
 #if DAC_DEBUG_ENABLE
     DacDebug_Service(&DAC_Debug_1);
 #endif
+
+#if SCI_COMM_ENABLE
+    // SCI采用非阻塞轮询，不影响现有DAC后台发送
+    SCIA_BackgroundTask();
+#endif
 }
 
 /**
@@ -134,6 +140,11 @@ static void Board_Init(Uint16 pwm_tbprd)
     // Disable both ePWM outputs before enabling any interrupt source.
     PWM_Disable();
     ADC_Init();
+
+#if SCI_COMM_ENABLE
+    SCIA_Init(SCIA_DEFAULT_BAUD);
+    SCIA_SendString("SCI-A ready.\r\n");
+#endif
 
 #if DAC_DEBUG_ENABLE
     TLV5620_Init();

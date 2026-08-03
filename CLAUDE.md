@@ -155,7 +155,8 @@ boost_app.c
  ├── timer1.h   → Timer1_Init(), Timer1_Start()
  ├── epwm.h     → EPWM1_Init() 和时基控制
  ├── led.h      → LED_Init()
- └── dac.h      → DAC 调试初始化和后台服务
+ ├── dac.h      → DAC 调试初始化和后台服务
+ └── sci.h      → SCI-A初始化和后台轮询通信
 
 adc.c / timer0.c / timer1.c  → 通过 GetBoostHandle() 获取 BoostController 指针
 function.c → 所有控制核心逻辑 (PI/SMC/保护/状态机/PWM更新)
