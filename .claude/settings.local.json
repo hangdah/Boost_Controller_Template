@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Name -Recurse -Depth 1)",
+      "Bash(Select-Object -First 80)",
+      "Bash(python *)",
+      "Bash(iconv --version)"
+    ]
+  }
+}
