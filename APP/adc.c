@@ -103,7 +103,7 @@ interrupt void adc_isr(void)
     }
 
 #if SCI_COMM_ENABLE
-    // ISR中只分频保存变量快照，字符串转换和发送由后台任务完成
+    // data_1~data_4当前依次映射IL、I_Ref、Duty和Vout
     SCIA_Debug_Capture(&SCIA_Debug_1,
                        p->adc.IL,
                        p->ctr.I_Ref,

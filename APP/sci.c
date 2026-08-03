@@ -126,10 +126,10 @@ void SCIA_Debug_Init(SCIA_Debug *p_debug, Uint16 updateDiv)
     }
 
     // 清零数据快照和运行状态
-    p_debug->IL = 0.0f;
-    p_debug->I_Ref = 0.0f;
-    p_debug->Duty = 0.0f;
-    p_debug->Vout = 0.0f;
+    p_debug->data_1 = 0.0f;
+    p_debug->data_2 = 0.0f;
+    p_debug->data_3 = 0.0f;
+    p_debug->data_4 = 0.0f;
     p_debug->Request = 0U;
     p_debug->Prescaler = 0U;
     p_debug->DroppedFrames = 0U;
@@ -142,10 +142,10 @@ void SCIA_Debug_Init(SCIA_Debug *p_debug, Uint16 updateDiv)
  * @brief  在ADC ISR中分频保存一帧调试数据。
  */
 void SCIA_Debug_Capture(SCIA_Debug *p_debug,
-                        float il,
-                        float iRef,
-                        float duty,
-                        float vout)
+                        float data_1,
+                        float data_2,
+                        float data_3,
+                        float data_4)
 {
     if (p_debug == 0)
     {
@@ -169,10 +169,10 @@ void SCIA_Debug_Capture(SCIA_Debug *p_debug,
         return;
     }
 
-    p_debug->IL = il;
-    p_debug->I_Ref = iRef;
-    p_debug->Duty = duty;
-    p_debug->Vout = vout;
+    p_debug->data_1 = data_1;
+    p_debug->data_2 = data_2;
+    p_debug->data_3 = data_3;
+    p_debug->data_4 = data_4;
 
     // 所有变量更新完成后再置位请求标志
     p_debug->Request = 1U;
@@ -180,16 +180,16 @@ void SCIA_Debug_Capture(SCIA_Debug *p_debug,
 
 /**
  * @brief  在后台将数据快照转换为CSV字符串并发送。
- * @note   输出顺序固定为IL,I_Ref,Duty,Vout，保留三位小数。
+ * @note   输出顺序固定为data_1,data_2,data_3,data_4，保留三位小数。
  */
 void SCIA_Debug_Service(SCIA_Debug *p_debug)
 {
     char buffer[SCIA_DEBUG_BUFFER_SIZE];
     Uint16 index;
-    float il;
-    float iRef;
-    float duty;
-    float vout;
+    float data_1;
+    float data_2;
+    float data_3;
+    float data_4;
 
     if ((p_debug == 0) || (p_debug->Request == 0U))
     {
@@ -197,19 +197,19 @@ void SCIA_Debug_Service(SCIA_Debug *p_debug)
     }
 
     // 请求保持置位期间ISR不会覆盖快照，可安全复制到局部变量
-    il = p_debug->IL;
-    iRef = p_debug->I_Ref;
-    duty = p_debug->Duty;
-    vout = p_debug->Vout;
+    data_1 = p_debug->data_1;
+    data_2 = p_debug->data_2;
+    data_3 = p_debug->data_3;
+    data_4 = p_debug->data_4;
 
     index = 0U;
-    index = SCIA_AppendFixed3(buffer, index, il);
+    index = SCIA_AppendFixed3(buffer, index, data_1);
     buffer[index++] = ',';
-    index = SCIA_AppendFixed3(buffer, index, iRef);
+    index = SCIA_AppendFixed3(buffer, index, data_2);
     buffer[index++] = ',';
-    index = SCIA_AppendFixed3(buffer, index, duty);
+    index = SCIA_AppendFixed3(buffer, index, data_3);
     buffer[index++] = ',';
-    index = SCIA_AppendFixed3(buffer, index, vout);
+    index = SCIA_AppendFixed3(buffer, index, data_4);
     buffer[index++] = '\r';
     buffer[index++] = '\n';
     buffer[index] = '\0';

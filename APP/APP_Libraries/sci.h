@@ -26,10 +26,10 @@
  */
 typedef struct
 {
-    volatile float IL;
-    volatile float I_Ref;
-    volatile float Duty;
-    volatile float Vout;
+    volatile float data_1;
+    volatile float data_2;
+    volatile float data_3;
+    volatile float data_4;
 
     volatile Uint16 Request;
     Uint16 Prescaler;
@@ -45,10 +45,10 @@ void SCIA_SendString(const char *message);
 Uint16 SCIA_TryReceiveByte(Uint16 *data);
 void SCIA_Debug_Init(SCIA_Debug *p_debug, Uint16 updateDiv);
 void SCIA_Debug_Capture(SCIA_Debug *p_debug,
-                        float il,
-                        float iRef,
-                        float duty,
-                        float vout);
+                        float data_1,
+                        float data_2,
+                        float data_3,
+                        float data_4);
 void SCIA_Debug_Service(SCIA_Debug *p_debug);
 
 #endif /* SCI_COMM_ENABLE */
