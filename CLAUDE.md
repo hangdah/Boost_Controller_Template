@@ -38,7 +38,7 @@ TI C2000 (TMS320F28335) 微逆变器 Boost 升压变换器控制程序**模板**
 | `AdcValues` | 采样值：`IL`(电感电流)、`Vout`(输出电压)、`Vin`(输入电压)、`Iout`(输出电流) + 标定系数 |
 | `ControlValues` | 控制信号：`V_Loop`/`I_Loop` (`PIController`)、`I_SMC_Loop` (`SMController`)、`V_Ref`/`I_Ref`/`u`、占空比限幅 |
 
-`main.c` 中定义全局静态实例 `boost_converter`，通过 `GetBoostHandle()` getter 供各中断服务函数访问（adc.c, timer0.c, timer1.c）。
+`APP/boost_app.c` 中定义全局静态实例 `boost_converter`，通过 `GetBoostHandle()` getter 供各中断服务函数访问（adc.c, timer0.c, timer1.c）。
 
 ### 控制策略
 
@@ -147,13 +147,15 @@ Init → Wait(1.5s延时) → Rise(参考斜坡) → Run(正常运行) → Err(�
 
 ```
 main.c
- ├── function.h → BoostController 定义
+ └── boost_app.h → 应用初始化、调度启动和后台任务
+
+boost_app.c
+ ├── function.h → BoostController 定义和控制初始化
  ├── adc.h      → ADC_Init(), adc_isr()
- ├── timer0.h   → Timer0_Init()（未调用）
- ├── timer1.h   → Timer1_Init()
- ├── epwm.h     → EPWM1_Init()
- ├── led.h      → LED_Init(), LEDx_ON/OFF/TOGGLE 宏
- └── mppt.h     → MPPT 数据结构/函数 (未使用)
+ ├── timer1.h   → Timer1_Init(), Timer1_Start()
+ ├── epwm.h     → EPWM1_Init() 和时基控制
+ ├── led.h      → LED_Init()
+ └── dac.h      → DAC 调试初始化和后台服务
 
 adc.c / timer0.c / timer1.c  → 通过 GetBoostHandle() 获取 BoostController 指针
 function.c → 所有控制核心逻辑 (PI/SMC/保护/状态机/PWM更新)
@@ -162,7 +164,7 @@ exit.c     → XINT1 外部中断 (未使用)
 
 ### 编码注意事项
 
-- 时间关键函数使用 `#pragma CODE_SECTION(func, ".TI.ramfunc")` 放置到 RAM 运行（Flash 构建时由 main.c 的 memcpy 从 FLASHD 拷贝到 RAML0）
+- 时间关键函数使用 `#pragma CODE_SECTION(func, ".TI.ramfunc")` 放置到 RAM 运行（Flash 构建时由 boost_app.c 的 memcpy 从 FLASHD 拷贝到 RAML0）
 - 寄存器访问需 `EALLOW`/`EDIS` 保护
 - ADC 结果低 4 位为无效位，需 `>> 4` 右移获取 12 位值
 - COFF 格式（非 ELF），`.cproject` 中 `OUTPUT_FORMAT=COFF`
