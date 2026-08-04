@@ -197,19 +197,19 @@ void Control_Init(BoostController *p)
     // 电压外环模式: OUTER_LOOP_PI 或 OUTER_LOOP_SMC
     p->flag.OuterLoopMode = OUTER_LOOP_PI;
     // 控制模式: CTRL_MODE_DUAL_LOOP / CTRL_MODE_SINGLE_LOOP / CTRL_MODE_OPEN_LOOP
-    p->flag.CtrlMode      = CTRL_MODE_DUAL_LOOP;
+    p->flag.CtrlMode      = CTRL_MODE_OPEN_LOOP;
     // 软启动开关: SOFTSTART_ENABLE 或 SOFTSTART_DISABLE
     p->flag.SoftStartEn   = SOFTSTART_ENABLE;
 
     // ADC 标定系数: 物理量 = Gain * ADC电压 + Offset
     p->adc.IL_Gain     = -3.6458f;
-    p->adc.IL_Offset   = 6.1978f;
-    p->adc.Vout_Gain   = 16.311f;
+    p->adc.IL_Offset   =  6.1978f;
+    p->adc.Vout_Gain   =  16.311f;
     p->adc.Vout_Offset = -0.7392f;
-    p->adc.Vin_Gain    = 0.0f;     // 预留
-    p->adc.Vin_Offset  = 0.0f;
-    p->adc.Iout_Gain   = 0.0f;     // 预留
-    p->adc.Iout_Offset = 0.0f;
+    p->adc.Vin_Gain    =  16.311f;
+    p->adc.Vin_Offset  = -0.7392f;
+    p->adc.Iout_Gain   = -3.6458f;
+    p->adc.Iout_Offset =  6.1978f;
 
     // 初始控制值和限幅
     p->ctr.V_Ref    = 0.0f;
