@@ -5,7 +5,7 @@
 #include "DSP2833x_Examples.h"
 
 #ifndef DAC_DEBUG_ENABLE
-#define DAC_DEBUG_ENABLE    1U
+#define DAC_DEBUG_ENABLE    0U
 #endif
 
 typedef enum

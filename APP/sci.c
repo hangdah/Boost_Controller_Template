@@ -5,6 +5,7 @@
  */
 
 #include "sci.h"
+#include "led.h"
 #include <stdint.h>
 
 #if SCI_COMM_ENABLE
@@ -215,6 +216,7 @@ void SCIA_Debug_Service(SCIA_Debug *p_debug)
     buffer[index] = '\0';
 
     SCIA_SendString(buffer);
+    LED6_TOGGLE;
 
     // 完整发送后释放快照，允许ISR写入下一帧
     p_debug->Request = 0U;

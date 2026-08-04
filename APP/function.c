@@ -16,14 +16,14 @@
 #include "function.h"
 
 // Rise状态下各控制模式的软启动参数
-#define RISE_V_REF_START    0.0f    // 双环模式电压参考初值
+#define RISE_V_REF_START    12.0f    // 双环模式电压参考初值
 #define RISE_V_TARGET       24.0f   // 双环模式电压参考目标值
-#define RISE_V_REF_STEP     0.1f    // 每次状态机调用的电压参考步长
+#define RISE_V_REF_STEP     0.24f    // 每次状态机调用的电压参考步长
 #define RISE_I_REF_START    0.6f    // 单环模式电流参考初值
-#define RISE_I_TARGET       2.4f    // 单环模式电流参考目标值
-#define RISE_I_REF_STEP     0.01f   // 每次状态机调用的电流参考步长
-#define RISE_D_TARGET       0.3f    // 开环模式占空比目标值
-#define RISE_D_STEP         0.02f   // 每次状态机调用的占空比步长
+#define RISE_I_TARGET       2.0f    // 单环模式电流参考目标值
+#define RISE_I_REF_STEP     0.02f   // 每次状态机调用的电流参考步长
+#define RISE_D_TARGET       0.5f    // 开环模式占空比目标值
+#define RISE_D_STEP         0.005f   // 每次状态机调用的占空比步长
 
 
 /*
@@ -152,23 +152,17 @@ float PI_ComputeIncremental_AntiWindup(PIController *pi, float ref, float fbk)
 void PI_Init(BoostController *p)
 {
     // 电流内环参数
-//    p->ctr.I_Loop.Ki       = 2488.5f;
-//    p->ctr.I_Loop.Ki_Ts    = p->ctr.I_Loop.Ki * p->pwm.Ts;
-//    p->ctr.I_Loop.Kp       = 0.0566f;
-    p->ctr.I_Loop.Ki       = 3155105.4373f / p->pwm.TBPRD;
+    p->ctr.I_Loop.Ki       = 1143478.4318f / p->pwm.TBPRD;
     p->ctr.I_Loop.Ki_Ts    = p->ctr.I_Loop.Ki * p->pwm.Ts;
-    p->ctr.I_Loop.Kp       = 832.1417f / p->pwm.TBPRD;
+    p->ctr.I_Loop.Kp       = 487.0020f / p->pwm.TBPRD;
 
     // 电压外环参数
-//    p->ctr.V_Loop.Ki       = 462.57f;
-//    p->ctr.V_Loop.Ki_Ts    = p->ctr.V_Loop.Ki * p->pwm.Ts;
-//    p->ctr.V_Loop.Kp       = 0.0736f;
-    p->ctr.V_Loop.Ki       = 113.5965f;
+    p->ctr.V_Loop.Ki       = 80.5714;
     p->ctr.V_Loop.Ki_Ts    = p->ctr.V_Loop.Ki * p->pwm.Ts;
-    p->ctr.V_Loop.Kp       = 0.4911f;
+    p->ctr.V_Loop.Kp       = 0.3583f;
 
     // 电压外环限幅
-    p->ctr.V_Loop.OutMax   = 9.0f;   // I_Ref 最大 9A
+    p->ctr.V_Loop.OutMax   = 3.0f;   // I_Ref 最大 9A
     p->ctr.V_Loop.OutMin   = 0.0f;
     p->ctr.V_Loop.ErrMax   = 5.0f;   // 电压误差钳位 ±5V
     p->ctr.V_Loop.ErrMin   = -5.0f;
@@ -197,7 +191,7 @@ void Control_Init(BoostController *p)
     // 电压外环模式: OUTER_LOOP_PI 或 OUTER_LOOP_SMC
     p->flag.OuterLoopMode = OUTER_LOOP_PI;
     // 控制模式: CTRL_MODE_DUAL_LOOP / CTRL_MODE_SINGLE_LOOP / CTRL_MODE_OPEN_LOOP
-    p->flag.CtrlMode      = CTRL_MODE_OPEN_LOOP;
+    p->flag.CtrlMode      = CTRL_MODE_DUAL_LOOP;
     // 软启动开关: SOFTSTART_ENABLE 或 SOFTSTART_DISABLE
     p->flag.SoftStartEn   = SOFTSTART_ENABLE;
 
@@ -442,7 +436,7 @@ void PWM_Values_Init(BoostController *p)
 {
     p->pwm.CPU_Freq = 150000000.0f;
     p->pwm.PWM_Freq = 20000.0f;
-    p->pwm.Ts = 1.0f / p->pwm.PWM_Freq;
+    p->pwm.Ts = 0.5f / p->pwm.PWM_Freq;
     p->pwm.Duty = p->ctr.MIN_Duty; // 以最小占空比启动
     // 为增减计数模式计算TBPRD: F_cpu / (2 * F_pwm)
     p->pwm.TBPRD = p->pwm.CPU_Freq/(2.0f * p->pwm.PWM_Freq);
@@ -487,9 +481,13 @@ void Process_Valley_Samples(BoostController *p)
     // 定义静态IIR滤波器状态变量
     static float TempIL_ = 0.0f;
     static float TempVo_  = 0.0f;
+    static float TempVi_  = 0.0f;
+    static float TempIo_  = 0.0f;
     const float ADC_Transform = 3.0f/4095.0f;
-    // IL -> ADB0
-    // Vo -> ADA0
+    // IL   -> ADCINA0
+    // Vo   -> ADCINB0
+    // Vin  -> ADCINA1
+    // Iout -> ADCINB1
 
     // 读取所有ADC结果
     float Raw_Result_0 = (float)(AdcRegs.ADCRESULT0 >> 4);
@@ -504,9 +502,12 @@ void Process_Valley_Samples(BoostController *p)
     TempVo_ = (Raw_Result_1 * ADC_Transform) * IIR_ALPHA + (1.0f - IIR_ALPHA) * TempVo_;
     p->adc.Vout = p->adc.Vout_Gain * TempVo_ + p->adc.Vout_Offset;
 
-    p->adc.Vin = 0.0f;
-    p->adc.Iout = 0.0f;
-    LED2_TOGGLE;
+    TempVi_ = (Raw_Result_2 * ADC_Transform) * IIR_ALPHA + (1.0f - IIR_ALPHA) * TempVi_;
+    p->adc.Vin = p->adc.Vin_Gain * TempVi_ + p->adc.Vin_Offset;
+
+    TempIo_ = (Raw_Result_3 * ADC_Transform) * IIR_ALPHA + (1.0f - IIR_ALPHA) * TempIo_;
+    p->adc.Iout = p->adc.Iout_Gain * TempIo_ + p->adc.Iout_Offset;
+
 }
 
 //=================================================================================================
@@ -523,9 +524,13 @@ void Process_Peak_Samples(BoostController *p)
     // 定义静态IIR滤波器状态变量
     static float TempIL_ = 0.0f;
     static float TempVo_  = 0.0f;
+    static float TempVi_  = 0.0f;
+    static float TempIo_  = 0.0f;
     const float ADC_Transform = 3.0f/4095.0f;
-    // IL -> ADB0
-    // Vo -> ADA0
+    // IL   -> ADCINA0
+    // Vo   -> ADCINB0
+    // Vin  -> ADCINA1
+    // Iout -> ADCINB1
 
     // 读取所有ADC结果
     float Raw_Result_4 = (float)(AdcRegs.ADCRESULT4 >> 4);
@@ -540,9 +545,12 @@ void Process_Peak_Samples(BoostController *p)
     TempVo_ = (Raw_Result_5 * ADC_Transform) * IIR_ALPHA + (1.0f - IIR_ALPHA) * TempVo_;
     p->adc.Vout = p->adc.Vout_Gain * TempVo_ + p->adc.Vout_Offset;
 
-    p->adc.Vin = 0.0f;
-    p->adc.Iout = 0.0f;
-    LED2_TOGGLE;
+    TempVi_ = (Raw_Result_6 * ADC_Transform) * IIR_ALPHA + (1.0f - IIR_ALPHA) * TempVi_;
+    p->adc.Vin = p->adc.Vin_Gain * TempVi_ + p->adc.Vin_Offset;
+
+    TempIo_ = (Raw_Result_7 * ADC_Transform) * IIR_ALPHA + (1.0f - IIR_ALPHA) * TempIo_;
+    p->adc.Iout = p->adc.Vout_Gain * TempIo_ + p->adc.Vout_Offset;
+
 }
 
 //=================================================================================================

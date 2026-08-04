@@ -105,10 +105,10 @@ interrupt void adc_isr(void)
 #if SCI_COMM_ENABLE
     // data_1~data_4当前依次映射IL、I_Ref、Duty和Vout
     SCIA_Debug_Capture(&SCIA_Debug_1,
+                       p->adc.Vin,
+                       p->adc.Vout,
                        p->adc.IL,
-                       p->ctr.I_Ref,
-                       p->pwm.Duty,
-                       p->adc.Vout);
+                       p->adc.Iout);
 #endif
 
     PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;

@@ -11,6 +11,7 @@
 - ePWM 在计数器谷值和峰值分别触发 ADC，实现每个 PWM 周期两次同步采样和控制计算。
 - 支持开环、电流单环、电压电流双环三种控制结构。
 - 电流内环和电压外环均提供 PI/滑模控制（SMC）选择，其中 PI 为默认环路算法。
+- 开环、电流单环 PI 和电压电流双环 PI 均已在配套实验平台完成验证；SMC 尚未进行硬件验证。
 - 提供上电等待、软启动、运行和故障锁定状态机。
 - 使用 ePWM Trip-Zone 实现 PWM 强制关断，并预留软件过流、过压、欠压和短路保护。
 - 支持 SCI-A 串口调试输出和 TLV5620 外部 DAC 波形观察。
@@ -22,19 +23,20 @@
 
 | 项目 | 默认值 |
 | --- | --- |
-| 主控制模式 | 开环 `CTRL_MODE_OPEN_LOOP` |
+| 主控制模式 | 电压电流双环 `CTRL_MODE_DUAL_LOOP` |
 | 电流内环 | PI `INNER_LOOP_PI` |
 | 电压外环 | PI `OUTER_LOOP_PI` |
 | 软启动 | 启用 |
-| 开环目标占空比 | 0.3 |
+| 双环电压参考 | 12 V → 24 V，每 5 ms 增加 0.24 V |
 | PWM 频率 | 20 kHz |
+| 控制计算频率 | 约 40 kHz |
 | 占空比范围 | 0.1～0.7 |
 | Timer1 周期 | 5 ms |
 | 上电等待时间 | 约 1.5 s |
 | SCI-A | 启用，115200 baud |
-| TLV5620 DAC 调试 | 启用 |
+| TLV5620 DAC 调试 | 关闭 |
 
-启动后 PWM 首先由单次 Trip 事件保持关闭。状态机经过 `Init -> Wait -> Rise` 后才清除 Trip 并启用输出；在当前开环模式下，占空比从 0.1 按每 5 ms 增加 0.02，最终到达 0.3。
+启动后 PWM 首先由单次 Trip 事件保持关闭。状态机经过 `Init -> Wait -> Rise` 后才清除 Trip 并启用输出；在当前双环 PI 模式下，电压参考从 12 V 按每 5 ms 增加 0.24 V，最终到达 24 V。
 
 ## 软件架构
 
@@ -83,7 +85,8 @@ ADC 工作在双序列器、同步采样模式，当前控制流程实际使用�
 | --- | --- | --- |
 | `ADCRESULT0` / `ADCRESULT4` | 电感电流 `IL` | 谷值/峰值电流采样 |
 | `ADCRESULT1` / `ADCRESULT5` | 输出电压 `Vout` | 谷值/峰值电压采样 |
-| `ADCRESULT2/3/6/7` | 预留 | 当前读取但未用于控制 |
+| `ADCRESULT2` / `ADCRESULT6` | 输入电压 `Vin` | 谷值/峰值输入电压采样 |
+| `ADCRESULT3` / `ADCRESULT7` | 输出电流 `Iout` | 谷值/峰值输出电流采样 |
 
 采样值经过一阶 IIR 滤波和线性标定后转换为物理量。标定关系为：
 
@@ -91,7 +94,7 @@ ADC 工作在双序列器、同步采样模式，当前控制流程实际使用�
 物理量 = Gain × ADC 输入电压 + Offset
 ```
 
-`Vin` 和 `Iout` 虽已预留标定参数，但采样处理函数当前仍将它们固定为 `0.0f`，尚未真正接入 ADC 通道。
+四路采样均配置了独立的线性标定参数，具体增益和偏置与传感器及调理电路相关，移植到其他硬件前必须重新校准。
 
 ### 3. 控制模式
 
@@ -99,11 +102,11 @@ ADC 工作在双序列器、同步采样模式，当前控制流程实际使用�
 
 | 控制模式 | 说明 | 软启动目标 |
 | --- | --- | --- |
-| `CTRL_MODE_OPEN_LOOP` | 不执行反馈控制，直接给定占空比 | `u: 0.1 -> 0.3` |
-| `CTRL_MODE_SINGLE_LOOP` | 电流 PI 或 SMC 单环 | `I_Ref: 0.6 A -> 2.4 A` |
-| `CTRL_MODE_DUAL_LOOP` | 电压外环生成电流参考，电流内环生成占空比 | `V_Ref: 0 V -> 24 V` |
+| `CTRL_MODE_OPEN_LOOP` | 不执行反馈控制，直接给定占空比 | `u: 0.1 -> 0.5` |
+| `CTRL_MODE_SINGLE_LOOP` | 电流 PI 或 SMC 单环 | `I_Ref: 0.6 A -> 2.0 A` |
+| `CTRL_MODE_DUAL_LOOP` | 电压外环生成电流参考，电流内环生成占空比 | `V_Ref: 12 V -> 24 V` |
 
-PI 控制器采用增量式计算并带输出限幅。SMC 已实现电流内环和电压外环，但其模型参数、输出电容和控制增益只是初始调试值，必须结合实际硬件重新辨识和整定。电流 SMC 还依赖 `Vin`，电压 SMC 依赖 `Iout`，在这两路采样接入前不应直接用于功率实验。
+PI 控制器采用增量式计算并带输出限幅。开环、电流单环 PI 和电压电流双环 PI 已在配套实验平台验证可用。SMC 已实现电流内环和电压外环，但尚未完成硬件验证，其模型参数、输出电容和控制增益必须结合实际硬件重新辨识和整定，不应直接用于功率实验。
 
 ### 4. 状态机与保护
 
@@ -122,15 +125,16 @@ Init -> Wait（约 1.5 s）-> Rise（软启动）-> Run
 - `Run`：正常运行；
 - `Err`：强制关闭 PWM，并保持故障锁定。
 
-工程包含软件 OCP、OVP、UVP 和输出短路检测函数，但当前 Timer1 中的 `SlowP(p)` 被注释，`ShortOff()` 也未被主流程调用，因此这些软件保护目前不会周期执行。`Iout` 又尚未实际采样，短路检测也不具备有效输入。现阶段可直接生效的是 ePWM TZ1 硬件关断；在真实功率级上使用前，必须补全并验证软件保护链路。
+工程包含软件 OCP、OVP、UVP 和输出短路检测函数，但当前 Timer1 中的 `SlowP(p)` 被注释，`ShortOff()` 也未被主流程调用，因此这些软件保护目前不会周期执行。现阶段可直接生效的是 ePWM TZ1 硬件关断；在真实功率级上使用前，必须补全并验证软件保护链路。
 
 ### 5. 调试接口
 
-- **SCI-A**：GPIO35 为 TX，GPIO36 为 RX，默认 115200 baud。后台任务输出四列数据：`IL`、`I_Ref`、`Duty`、`Vout`。
-- **TLV5620 DAC**：SPIA 使用 GPIO54（数据）和 GPIO56（时钟），GPIO26 控制 LOAD；默认将占空比映射到 DAC 通道 0。
-- **LED**：GPIO64～68 和 GPIO10～11 用作板载状态指示；当前 Timer1 中断翻转 LED1，ADC 采样处理翻转 LED2。
+- **SCI-A**：GPIO35 为 TX，GPIO36 为 RX，默认 115200 baud。后台任务按 `Vin,Vout,IL,Iout` 顺序输出四列 CSV 数据。
+- **TLV5620 DAC**：SPIA 使用 GPIO54（数据）和 GPIO56（时钟），GPIO26 控制 LOAD；当前默认关闭 DAC 调试。
+- **MATLAB 上位机**：仓库根目录的 `BoostSerialMonitor.m` 可接收 SCI-A 四通道数据并实时绘制波形，后续计划独立整理为上位机项目。
+- **LED**：GPIO64～68 和 GPIO10～11 用作板载状态指示；当前 Timer1 中断翻转 LED1，SCI 数据发送完成后翻转 LED6。
 
-SCI 和 DAC 功能分别由 `APP/APP_Libraries/sci.h` 中的 `SCI_COMM_ENABLE`、`APP/APP_Libraries/dac.h` 中的 `DAC_DEBUG_ENABLE` 控制。若硬件没有连接 TLV5620，建议在编译前关闭 DAC 调试。
+SCI 和 DAC 功能分别由 `APP/APP_Libraries/sci.h` 中的 `SCI_COMM_ENABLE`、`APP/APP_Libraries/dac.h` 中的 `DAC_DEBUG_ENABLE` 控制。
 
 ## 目录结构
 
@@ -148,6 +152,7 @@ SCI 和 DAC 功能分别由 `APP/APP_Libraries/sci.h` 中的 `SCI_COMM_ENABLE`�
 │  └─ APP_Libraries/              应用层头文件
 ├─ DSP2833x_Librsries/            F28335 支持源码、链接文件和 IQmath 库
 ├─ targetConfigs/                 CCS 目标连接配置
+├─ BoostSerialMonitor.m           MATLAB 串口波形显示脚本
 ├─ .project / .cproject           CCS 工程配置
 └─ Debug/                         CCS 生成的构建产物（Git 已忽略）
 ```
@@ -216,7 +221,7 @@ gmake -C Debug all
 3. 检查 ePWM1A/1B 的频率、极性、死区和 Trip-Zone 关断状态。
 4. 给 ADC 输入安全的已知信号，核对原始码值、标定结果和串口数据。
 5. 确认 PWM 默认保持关闭、TZ1 能可靠关断后，再允许状态机进入 `Rise`。
-6. 使用低电压、限流电源逐步验证开环占空比，之后再进行单环或双环调试。
+6. 使用低电压、限流电源逐步复现开环、单电流环 PI 或双环 PI 控制；SMC 应在单独完成参数整定和验证后再接入功率级。
 
 ## 调参入口
 
@@ -232,7 +237,7 @@ gmake -C Debug all
 
 ## 已知限制
 
-- `Vin`、`Iout` 尚未接入实际 ADC 采样，依赖它们的 SMC 和短路保护不能直接使用。
+- SMC 控制尚未经过硬件验证，当前参数不能直接用于功率实验。
 - 软件 OCP/OVP/UVP 调度当前未启用，不能替代硬件保护。
 - MPPT、Timer0 和外部按键中断模块已提供，但没有接入当前主程序。
 - ADC 标定系数、PI/SMC 参数、死区和保护阈值均与具体硬件相关，使用前必须重新确认。
